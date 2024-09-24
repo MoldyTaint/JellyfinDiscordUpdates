@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  jellyfin-discord-notifier:
+    image: ghcr.io/moldytaint/jellyfindiscordupdates:main
+    container_name: jellyfin-discord-notifier
+    volumes:
+      - ./Config:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - TZ=America/Chicago  # Replace with your timezone, e.g., America/New_York
+    restart: unless-stopped
