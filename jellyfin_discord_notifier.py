@@ -7,6 +7,9 @@ import json
 import sqlite3
 import logging
 from logging.handlers import RotatingFileHandler
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
+from pytz import timezone
 
 # Set up logging
 log_file = 'jellyfin_discord_notifier.log'
@@ -33,6 +36,12 @@ if not DISCORD_WEBHOOK_URL:
 
 # Database file
 DB_FILE = os.getenv('DB_FILE', 'jellyfin_items.db')
+
+# New scheduling configurations
+RUN_FREQUENCY = os.getenv('RUN_FREQUENCY', 'daily')
+RUN_TIME = os.getenv('RUN_TIME', '09:00')
+TIMEZONE = os.getenv('TIMEZONE', 'UTC')
+DAYS_OF_WEEK = os.getenv('DAYS_OF_WEEK', 'mon,tue,wed,thu,fri,sat,sun').split(',')
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -130,29 +139,35 @@ def send_discord_message(items):
             logging.error(f"Response content: {response.text}")
         time.sleep(1)  # Add a small delay between messages to avoid rate limiting
 
-def main():
+def run_job():
+    logging.info("Starting Jellyfin Discord Notifier job")
     conn = init_db()
     new_items = get_new_items(conn)
     
     if not new_items:
         logging.info("No new items found.")
-        return
-
-    # Check if this is the first run
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM items")
-    item_count = c.fetchone()[0]
-    
-    if item_count == len(new_items):
-        logging.info(f"First run: {len(new_items)} items added to the database. No Discord message sent.")
         conn.close()
         return
 
     send_discord_message(new_items)
-
     conn.close()
-    logging.info("Script execution completed")
+    logging.info("Job execution completed")
 
 if __name__ == "__main__":
-    logging.info("Starting Jellyfin Discord Notifier")
-    main()
+    scheduler = BlockingScheduler()
+    
+    hour, minute = map(int, RUN_TIME.split(':'))
+    tz = timezone(TIMEZONE)
+
+    if RUN_FREQUENCY == 'daily':
+        scheduler.add_job(run_job, CronTrigger(hour=hour, minute=minute, timezone=tz))
+    elif RUN_FREQUENCY == 'weekly':
+        scheduler.add_job(run_job, CronTrigger(day_of_week=','.join(DAYS_OF_WEEK), hour=hour, minute=minute, timezone=tz))
+    elif RUN_FREQUENCY == 'monthly':
+        scheduler.add_job(run_job, CronTrigger(day=1, hour=hour, minute=minute, timezone=tz))
+    else:
+        logging.error(f"Invalid RUN_FREQUENCY: {RUN_FREQUENCY}")
+        exit(1)
+
+    logging.info(f"Scheduler set up with {RUN_FREQUENCY} frequency at {RUN_TIME} {TIMEZONE}")
+    scheduler.start()
