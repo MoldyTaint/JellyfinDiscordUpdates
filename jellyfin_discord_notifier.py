@@ -113,7 +113,7 @@ def send_discord_message(items):
         item_message = title_line + "\n"
         
         if 'Genres' in item and item['Genres']:
-            item_message += f"Genres: {', '.join(item['Genres'][:3])}\n"
+            item_message += f"{', '.join(item['Genres'][:3])}\n"
         if 'Overview' in item and item['Overview']:
             overview = item['Overview'][:100] + "..." if len(item['Overview']) > 100 else item['Overview']
             item_message += f"> {overview}\n"
