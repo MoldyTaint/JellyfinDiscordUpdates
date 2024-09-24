@@ -2,11 +2,11 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
+# Copy requirements.txt first to leverage Docker cache
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY jellyfin_discord_notifier.py .
-COPY .env .
 
 # Create a volume for the database file
 VOLUME /app/data
