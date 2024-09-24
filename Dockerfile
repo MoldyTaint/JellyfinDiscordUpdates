@@ -14,4 +14,7 @@ VOLUME /app/data
 # Set the database file path to the volume
 ENV DB_FILE=/app/data/jellyfin_items.db
 
+# Set the timezone
+ENV TZ=UTC
+
 CMD ["python", "jellyfin_discord_notifier.py"]

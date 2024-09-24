@@ -26,6 +26,9 @@ jobs:
           echo "JELLYFIN_URL=http://example.com" > .env
           echo "JELLYFIN_API_KEY=dummy_key" >> .env
           echo "DISCORD_WEBHOOK_URL=http://example.com/webhook" >> .env
+          echo "RUN_FREQUENCY=daily" >> .env
+          echo "RUN_TIME=09:00" >> .env
+          echo "TIMEZONE=UTC" >> .env
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3

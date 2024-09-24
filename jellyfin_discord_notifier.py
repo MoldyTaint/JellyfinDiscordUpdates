@@ -35,7 +35,7 @@ if not DISCORD_WEBHOOK_URL:
     exit(1)
 
 # Database file
-DB_FILE = os.getenv('DB_FILE', 'jellyfin_items.db')
+DB_FILE = os.getenv('DB_FILE', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'jellyfin_items.db'))
 
 # New scheduling configurations
 RUN_FREQUENCY = os.getenv('RUN_FREQUENCY', 'daily')
