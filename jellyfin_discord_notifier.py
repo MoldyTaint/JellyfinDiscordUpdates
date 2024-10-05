@@ -140,9 +140,60 @@ def send_discord_message(items):
             logging.error(f"Response content: {response.text}")
         time.sleep(1)  # Add a small delay between messages to avoid rate limiting
 
+def is_db_empty(conn):
+    """
+    Check if the 'items' table is empty.
+    """
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM items")
+    count = c.fetchone()[0]
+    return count == 0
+
+def populate_database(conn):
+    """
+    Populate the database with existing items without sending notifications.
+    """
+    c = conn.cursor()
+    
+    url = f"{JELLYFIN_URL}/Items?IncludeItemTypes=Movie,Series&SortBy=DateCreated&SortOrder=Descending&Recursive=true&Fields=Name,ProductionYear,ProviderIds,Overview,Genres,MediaSources,MediaStreams&api_key={JELLYFIN_API_KEY}"
+    
+    logging.debug(f"Fetching items from Jellyfin URL: {url}")
+    response = requests.get(url)
+    if response.status_code == 200:
+        items = response.json().get('Items', [])
+        logging.debug(f"Received {len(items)} items from Jellyfin")
+        
+        for item in items:
+            provider_ids = item.get('ProviderIds', {})
+            imdb_id = provider_ids.get('Imdb')
+            if not imdb_id:
+                logging.debug(f"Item {item['Name']} does not have an IMDb ID. Skipping.")
+                continue  # Skip items without IMDb ID
+            
+            c.execute("SELECT imdb_id FROM items WHERE imdb_id = ?", (imdb_id,))
+            result = c.fetchone()
+            
+            if result is None:
+                logging.debug(f"Adding item to database (initial run): {item['Name']} (IMDb ID: {imdb_id})")
+                c.execute("INSERT INTO items VALUES (?, ?, ?, ?, ?)", 
+                          (imdb_id, item['Name'], item['ProductionYear'], get_item_quality(item), datetime.now().isoformat()))
+        
+        conn.commit()
+        logging.info("Database populated with existing items.")
+    else:
+        logging.error(f"Error fetching items from Jellyfin: {response.status_code}")
+
 def run_job():
     logging.info("Starting Jellyfin Discord Notifier job")
     conn = init_db()
+    
+    if is_db_empty(conn):
+        logging.info("Database is empty. Performing initial run to populate database without sending notifications.")
+        populate_database(conn)
+        conn.close()
+        logging.info("Initial run completed.")
+        return
+    
     new_items = get_new_items(conn)
     
     if not new_items:
