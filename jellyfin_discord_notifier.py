@@ -47,7 +47,7 @@ def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS items
-                 (id TEXT PRIMARY KEY, name TEXT, year INTEGER, quality TEXT, last_updated TEXT)''')
+                 (imdb_id TEXT PRIMARY KEY, name TEXT, year INTEGER, quality TEXT, last_updated TEXT)''')  # Changed 'id' to 'imdb_id'
     conn.commit()
     return conn
 
@@ -73,22 +73,23 @@ def get_new_items(conn):
         new_items = []
         
         for item in items:
-            item_id = item['Id']
-            item_name = item['Name']
-            item_year = item['ProductionYear']
-            item_quality = get_item_quality(item)
+            provider_ids = item.get('ProviderIds', {})
+            imdb_id = provider_ids.get('Imdb')
+            if not imdb_id:
+                logging.debug(f"Item {item['Name']} does not have an IMDb ID. Skipping.")
+                continue  # Skip items without IMDb ID
             
-            c.execute("SELECT id FROM items WHERE id = ?", (item_id,))
+            c.execute("SELECT imdb_id FROM items WHERE imdb_id = ?", (imdb_id,))
             result = c.fetchone()
             
             if result is None:
-                logging.debug(f"New item found: {item_name}")
+                logging.debug(f"New item found: {item['Name']} (IMDb ID: {imdb_id})")
                 c.execute("INSERT INTO items VALUES (?, ?, ?, ?, ?)", 
-                          (item_id, item_name, item_year, item_quality, datetime.now().isoformat()))
+                          (imdb_id, item['Name'], item['ProductionYear'], get_item_quality(item), datetime.now().isoformat()))
                 new_items.append(item)
             else:
-                logging.debug(f"Existing item found: {item_name}. Stopping check.")
-                break
+                logging.debug(f"Existing item found: {item['Name']} (IMDb ID: {imdb_id}). Skipping.")
+                # Do not break; allow processing other items
         
         conn.commit()
         logging.info(f"Found {len(new_items)} new items")
